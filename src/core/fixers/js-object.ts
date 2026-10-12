@@ -31,6 +31,20 @@ export function serialize(value: unknown, indent: string, quote: Quote = "'", st
   return quoteString(String(value), quote);
 }
 
+/** Single-line literal for short values (used when editing single-line objects); null if too long. */
+export function serializeInline(value: unknown, quote: Quote = "'", max = 80): string | null {
+  const render = (v: unknown): string => {
+    if (Array.isArray(v)) return `[${v.map(render).join(', ')}]`;
+    if (isPlainObject(v)) {
+      const entries = Object.entries(v).filter(([, x]) => x !== undefined);
+      return entries.length ? `{ ${entries.map(([k, x]) => `${formatKey(k, quote)}: ${render(x)}`).join(', ')} }` : '{}';
+    }
+    return serialize(v, '', quote);
+  };
+  const out = render(value);
+  return out.length <= max ? out : null;
+}
+
 export function formatKey(key: string, quote: Quote): string {
   return IDENT.test(key) ? key : quoteString(key, quote);
 }
@@ -107,7 +121,8 @@ export function mergeIntoObject(obj: ObjectExpression, updates: Record<string, u
     if (!existing) {
       if (props.some((p) => p.type === 'SpreadElement')) ctx.warnings.push(`"${path}" added next to a spread; the spread may override it depending on order.`);
       if (value === null) continue;
-      additions.push(`${formatKey(key, quote)}: ${serialize(value, multiline || !props.length ? childIndent : parentIndent, quote)}`);
+      const inline = !multiline && props.length ? serializeInline(value, quote) : null;
+      additions.push(`${formatKey(key, quote)}: ${inline ?? serialize(value, multiline || !props.length ? childIndent : parentIndent, quote)}`);
       ctx.applied.push(path);
       continue;
     }

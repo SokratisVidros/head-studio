@@ -1,6 +1,6 @@
 import { Check, Copy, FileCode2, Wand2 } from 'lucide-react';
-import { useState } from 'react';
-import { applyFix, type FixResponse } from '../api';
+import { useEffect, useState } from 'react';
+import { applyFix, locate, type FixResponse } from '../api';
 import { buttonGhost, buttonPrimary, buttonSecondary, cx, inputClass, Panel, Segmented } from './ui';
 
 const FRAMEWORKS = [
@@ -24,9 +24,27 @@ function writePref(key: string, value: string) {
   }
 }
 
-export function FixPanel({ updates, onApplied }: { updates: Record<string, unknown>; onApplied?: () => void }) {
+export function FixPanel({ updates, route, onApplied }: { updates: Record<string, unknown>; route?: string; onApplied?: () => void }) {
   const [framework, setFramework] = useState(() => readPref('hs.framework', 'nextjs'));
-  const [filePath, setFilePath] = useState(() => readPref('hs.filePath', ''));
+  const [filePath, setFilePath] = useState('');
+  const [located, setLocated] = useState<string | null>(null);
+  // Prefill with the file that owns this route's metadata (falls back to the last path used).
+  useEffect(() => {
+    let cancelled = false;
+    locate(route ?? '/')
+      .then((r) => {
+        if (cancelled) return;
+        if (r.recommended) {
+          setFilePath(r.recommended.file);
+          setFramework(r.recommended.framework);
+          setLocated(r.recommended.metadata);
+        } else setFilePath((p) => p || readPref('hs.filePath', ''));
+      })
+      .catch(() => setFilePath((p) => p || readPref('hs.filePath', '')));
+    return () => {
+      cancelled = true;
+    };
+  }, [route]);
   const [result, setResult] = useState<FixResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -85,6 +103,7 @@ export function FixPanel({ updates, onApplied }: { updates: Record<string, unkno
           </button>
         </div>
       </div>
+      {located && <p className="mt-2 text-[12px] text-muted">located via route · declares metadata with <span className="text-ink">{located}</span></p>}
       <pre className="mt-3 max-h-40 overflow-auto rounded-md bg-subtle p-3 text-[12px] leading-5 text-body ring-1 ring-line ring-inset">{JSON.stringify(updates, null, 2)}</pre>
       {result && (
         <div className="mt-3 space-y-2">

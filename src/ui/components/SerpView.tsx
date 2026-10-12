@@ -146,7 +146,7 @@ export function SerpView({ report, onApplied }: { report: InspectReport; onAppli
         </Panel>
       </div>
 
-      {Object.keys(updates).length > 0 && <FixPanel updates={updates} onApplied={onApplied} />}
+      {Object.keys(updates).length > 0 && <FixPanel updates={updates} route={report.url} onApplied={onApplied} />}
 
       <Panel title="issues">
         <IssueList issues={issues} />

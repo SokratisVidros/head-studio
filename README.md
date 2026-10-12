@@ -12,6 +12,7 @@ npx head-studio mcp                 # MCP server over stdio
 - **Pixel-accurate SERP simulator.** Titles and descriptions are measured with Arial glyph metrics against Google's desktop (~600px / ~960px) and mobile limits.
 - **Real asset checks.** OG images, touch icons and manifest icons are loaded and measured (1200×630 / 1.91:1, 180×180, 192/512…).
 - **Schema checks.** Every `application/ld+json` block is parsed (with line/column syntax errors) and validated against rules for Organization, WebSite, Article/BlogPosting/NewsArticle, Product and BreadcrumbList.
+- **Agent-ready.** `head-studio init` wires the MCP server and skill into Claude Code, Cursor or VS Code; issues carry ready-to-apply fixes and `locate_source` maps routes to files.
 - **Framework-native fixes.** Edits `export const metadata` in Next.js App Router files, `<SEO>` props / layout `<head>` in Astro, or the `<head>` of plain HTML — preserving your formatting.
 
 ## Dashboard
@@ -28,51 +29,58 @@ Tabs: **Overview** (score + prioritized issues), **Meta & SERP** (Google preview
 
 The server binds to `127.0.0.1` and rejects requests whose `Host`/`Origin` is not local.
 
-## CLI
+## Use it with your coding agent
 
 ```bash
-# Human-readable report
-npx head-studio inspect http://localhost:3000
-
-# Strict JSON for scripts/agents (nothing else is written to stdout)
-npx head-studio inspect --url http://localhost:3000/blog/post-1 --json
-
-# Static builds: directories, files, or extension-less routes
-npx head-studio inspect --url ./out --route /blog/post-1
-npx head-studio inspect --url ./dist/about/index.html --root ./dist
-
-# CI: exit 1 when errors (or warnings) are found
-npx head-studio inspect --url ./out --fail-on error
-
-# SERP pixel widths
-npx head-studio serp --title "My title" --description "My description"
-
-# Apply a fix (Next.js Metadata shape for every framework)
-npx head-studio fix app/layout.tsx --updates '{"title":"Acme","openGraph":{"images":[{"url":"https://acme.example/og.png","width":1200,"height":630}]}}' --dry-run
-npx head-studio fix src/pages/index.astro --title "Acme" --description "Rockets for everyone"
+npx head-studio init            # registers the MCP server + installs the skill for detected agents
+npx head-studio init --agent all  # claude, cursor, vscode
+npx head-studio doctor          # what's detected: framework, target, source files, agents
 ```
 
-Exit codes: `0` success, `1` `--fail-on` threshold reached (or fix failed), `2` target could not be loaded.
+| Agent | MCP registration | Guidance |
+| --- | --- | --- |
+| Claude Code | `.mcp.json` | `.claude/skills/head-studio/SKILL.md` |
+| Cursor | `.cursor/mcp.json` | `.cursor/rules/head-studio.mdc` |
+| VS Code (Copilot) | `.vscode/mcp.json` | `.github/instructions/head-studio.instructions.md` |
 
-## MCP server
+`init` merges into existing config files, is idempotent, and supports `--dry-run`, `--no-skill`, and `--npx` / `--local` (how the server is launched; auto-detected). Prefer a one-off? `claude mcp add head-studio -- npx -y head-studio mcp`.
 
-```bash
-claude mcp add head-studio -- npx -y head-studio mcp
-```
+Then ask your agent to *"audit the metadata of /blog"*, or in Claude Code run the bundled prompt **`/mcp__head-studio__audit`**.
 
-Cursor / other clients:
-
-```json
-{ "mcpServers": { "head-studio": { "command": "npx", "args": ["-y", "head-studio", "mcp"] } } }
-```
+### MCP tools
 
 | Tool | Input | Output |
 | --- | --- | --- |
-| `inspect_route` | `{ url, route?, root? }` | Full JSON report (tags, favicon grid, SERP widths, JSON-LD, issues) |
+| `inspect_route` | `{ url?, route?, root?, detail?: "summary" \| "full" }` | Compact audit by default: issues (with ready-to-apply `fix` objects), `suggestedUpdates`, SERP widths, OG/X, favicon grid, JSON-LD. `url` auto-detects the dev server or build. |
+| `locate_source` | `{ route }` | The file that owns the route's metadata (Next.js app router incl. route groups and dynamic segments, Astro pages/layouts, HTML) and how it declares it |
 | `validate_serp_snippet` | `{ title, description }` | Pixel widths, character counts and truncation for desktop/mobile |
-| `apply_metadata_fix` | `{ filePath, targetFramework: "nextjs" \| "astro" \| "html", updates, dryRun? }` | Applied keys, warnings and a unified diff |
+| `apply_metadata_fix` | `{ filePath, updates, targetFramework?, dryRun? }` | Applied keys, warnings and a unified diff |
 
-`apply_metadata_fix` only edits files inside the server's working directory. [`SKILL.md`](./SKILL.md) contains agent guidance for the full inspect → draft → fix → verify loop.
+Prompt: `audit { target?, route? }` — the full inspect → locate → draft → apply → verify loop. The server only edits files inside its working directory. See [`SKILL.md`](./SKILL.md).
+
+## CLI
+
+```bash
+npx head-studio inspect                       # auto-detects the dev server or ./out, ./dist…
+npx head-studio inspect http://localhost:3000 --route /blog/post-1
+npx head-studio inspect --url ./out --route /blog/post-1 --json            # full JSON
+npx head-studio inspect --json --summary                                     # compact JSON for agents
+npx head-studio inspect --url ./out --fail-on error                         # CI gate
+
+npx head-studio locate /blog/hello            # → app/blog/[slug]/page.tsx (generateMetadata)
+npx head-studio serp --title "My title" --description "My description"
+
+# Apply the auto-fixable suggestions from an inspection (file located from the route)
+npx head-studio fix --route /blog/post-1 --from http://localhost:3000 --dry-run
+# …or explicit updates (Next.js Metadata shape for every framework)
+npx head-studio fix app/layout.tsx --updates '{"openGraph":{"images":[{"url":"https://acme.example/og.png","width":1200,"height":630}]}}'
+npx head-studio fix src/pages/index.astro --title "Acme" --description "Rockets for everyone"
+npx head-studio inspect --json | npx head-studio fix app/page.tsx --updates -   # pipe a report's suggestedUpdates
+```
+
+The text report ends with **next steps**: the source file for the route, a ready-to-run `fix` command for auto-fixable issues, and what still needs judgement.
+
+Exit codes: `0` success, `1` `--fail-on` threshold reached (or fix failed), `2` target could not be loaded / bad input.
 
 ## Fixers
 

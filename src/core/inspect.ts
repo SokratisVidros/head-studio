@@ -4,6 +4,7 @@ import { parseIconLinks } from './parsers/favicons.js';
 import { extractJsonLd } from './parsers/jsonld.js';
 import { parseMeta } from './parsers/meta.js';
 import { parseOpenGraph, parseTwitter } from './parsers/opengraph.js';
+import { attachFixes } from './suggest.js';
 import type { InspectReport, Issue } from './types.js';
 import { validateFavicons } from './validators/favicons.js';
 import { validateJsonLd } from './validators/jsonld.js';
@@ -60,7 +61,7 @@ async function inspectDocument(doc: LoadedDocument, target: string, started: num
   const infos = issues.length - errors - warnings;
   const score = Math.max(0, 100 - issues.reduce((s, i) => s + PENALTY[i.severity], 0));
 
-  return {
+  const report: Omit<InspectReport, 'suggestedUpdates'> = {
     schemaVersion: 1,
     target,
     url: doc.url,
@@ -77,4 +78,6 @@ async function inspectDocument(doc: LoadedDocument, target: string, started: num
     issues,
     summary: { errors, warnings, infos, score },
   };
+  const suggestedUpdates = attachFixes(report);
+  return { ...report, suggestedUpdates };
 }

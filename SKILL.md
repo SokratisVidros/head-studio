@@ -5,76 +5,73 @@ description: Audit and fix a web page's <head> metadata — title/description SE
 
 # head-studio
 
-`head-studio` inspects a running dev server (`http://localhost:3000/...`) or a static build (`./dist`, `./out`, `./public`) and fixes metadata in source files using each framework's own conventions.
+Inspects a running dev server or a static build, finds the source file that owns a route's metadata, and edits it with framework-native conventions (Next.js `export const metadata`, Astro `<SEO>`/layout `<head>`, HTML `<head>`).
 
 ## Tools
 
-Prefer the MCP tools when the `head-studio` MCP server is connected; otherwise use the CLI equivalents. CLI `--json` output is strict JSON on stdout (logs go to stderr).
+Use the MCP tools when the `head-studio` server is connected. Otherwise run the CLI; every command below accepts `--json` and then prints only JSON on stdout.
 
-| MCP tool | CLI | Purpose |
+| Step | MCP tool | CLI |
 | --- | --- | --- |
-| `inspect_route { url, route?, root? }` | `npx head-studio inspect --url <url-or-path> --json` | Full report: meta, SERP pixel widths, OG/Twitter, favicon grid, JSON-LD, `issues[]` |
-| `validate_serp_snippet { title, description }` | `npx head-studio serp --title "…" --description "…" --json` | Pixel widths + truncation for desktop and mobile |
-| `apply_metadata_fix { filePath, targetFramework, updates, dryRun? }` | `npx head-studio fix <file> --framework nextjs --updates '<json>' [--dry-run] --json` | Edit the source file and return a unified diff |
+| Audit | `inspect_route { url?, route?, detail? }` | `npx head-studio inspect [url] --route /x --json --summary` |
+| Find the file | `locate_source { route }` | `npx head-studio locate /x --json` |
+| Check copy | `validate_serp_snippet { title, description }` | `npx head-studio serp --title "…" --description "…" --json` |
+| Write | `apply_metadata_fix { filePath, updates, targetFramework?, dryRun? }` | `npx head-studio fix <file> --updates '<json>' [--dry-run] --json` |
+
+`url` is optional: head-studio auto-detects the dev server (port from `package.json`) or a build dir (`out/`, `dist/`). If neither exists, start the dev server (`npm run dev`) in the background or build the site, then retry. `npx head-studio doctor` shows what is detected.
 
 ## Workflow
 
-1. **Find the target.** Ask for or detect the dev server URL (check `package.json` scripts; Next.js defaults to `:3000`, Astro to `:4321`, Vite to `:5173`). If no server is running, build and inspect the output directory (`out/`, `dist/`).
-2. **Inspect.** Call `inspect_route` for each important route (home page, a representative article/product page). Work through `issues` in order — they are sorted errors → warnings → info. Each issue has a stable `code` and usually a `hint`.
-3. **Draft copy.** For titles and descriptions, iterate with `validate_serp_snippet` until `desktop.title.truncated` and `desktop.description.truncated` are both `false`. Keep titles unique per page, front-load keywords, and aim for 70–155 characters in descriptions. Don't invent facts about the product — derive copy from the page content.
-4. **Locate the source file** that owns the route's metadata:
-   - **Next.js App Router:** the nearest `page.tsx` / `layout.tsx` under `app/` (`app/layout.tsx` for site-wide defaults, `app/blog/[slug]/page.tsx` for a post). Files with `"use client"` cannot export metadata.
-   - **Astro:** the page in `src/pages/` if it renders `<SEO>` or passes `title`/`description` to a layout; otherwise the layout in `src/layouts/` that owns `<head>`.
-   - **Plain HTML:** the HTML file itself (e.g. `public/index.html`, `index.html`).
-5. **Preview, then apply.** Call `apply_metadata_fix` with `dryRun: true`, review the diff, then call again without `dryRun`.
-6. **Verify.** Re-run `inspect_route` and confirm the issues are gone. Dev servers usually hot-reload; static builds need a rebuild.
+1. **Inspect.** `inspect_route` for each route in scope (default to `/` plus one representative content page). The default summary has everything needed; ask for `detail: "full"` only for raw tags or JSON-LD payloads.
+2. **Triage.** `issues` are sorted error → warning → info. Each has a stable `code`, a `hint`, and — when the fix can be derived from the page — a `fix` object. `suggestedUpdates` is the merge of all of them (it deliberately excludes removing `noindex`).
+3. **Locate.** `locate_source` with the route. Use `recommended.file`. Its `metadata` field tells you what you'll be editing:
+   - `export const metadata` / `none` → route-specific values go here.
+   - `generateMetadata` → values are dynamic; only change literals, keep data-driven fields dynamic.
+   - `root-layout` → site-wide defaults (`metadataBase`, `openGraph.siteName`, `twitter.site`, title template). Put shared values here, not on every page.
+   - Astro `layout props` → change the `title`/`description` props; `<head>` → edit the layout.
+4. **Draft copy.** For missing/short/truncated titles and descriptions, write copy from the page's actual content (read the page component or fetch the page). Run `validate_serp_snippet` until `desktop.title.truncated` and `desktop.description.truncated` are `false`. Titles: unique, ~50–60 chars, key term first. Descriptions: ~120–155 chars, concrete.
+5. **Apply.** Merge `suggestedUpdates` with your copy into one `updates` object → `apply_metadata_fix` with `dryRun: true` → check the diff → apply.
+6. **Verify.** Re-run `inspect_route`; report the score before/after and anything left for a human.
 
-## The `updates` object
+## `updates` shape
 
-Always use the **Next.js `Metadata` shape**, for every framework — the fixer translates it into Astro `<SEO>` props or HTML `<meta>`/`<link>` tags:
+Always the **Next.js `Metadata` shape**, for every framework. Nested objects deep-merge; `null` removes a key.
 
 ```json
 {
   "title": "Acme Rockets — Reusable launch vehicles",
-  "description": "Acme builds reusable rockets that make orbit affordable.",
+  "description": "Acme builds reusable rockets that make orbit affordable for small satellites.",
   "canonical": "https://acme.example/",
-  "robots": { "index": true, "follow": true },
   "openGraph": {
-    "title": "Acme Rockets",
-    "description": "Reusable launch vehicles that make orbit affordable.",
-    "url": "https://acme.example/",
-    "siteName": "Acme",
     "type": "website",
+    "url": "https://acme.example/",
     "images": [{ "url": "https://acme.example/og.png", "width": 1200, "height": 630, "alt": "Acme rocket on the pad" }]
   },
-  "twitter": { "card": "summary_large_image", "site": "@acme" }
+  "twitter": { "card": "summary_large_image" }
 }
 ```
 
-- Nested objects are **deep-merged**: you only need to send the keys you change.
-- Set a key to `null` to remove it (e.g. `"robots": null` to drop a stray `noindex`).
-- `canonical` is shorthand for `alternates.canonical`. In Next.js, `themeColor` is written to `export const viewport`.
-- Next.js-only keys (e.g. `metadataBase`, `icons`, `alternates.languages`) pass straight through to `export const metadata`.
+`canonical` is shorthand for `alternates.canonical`. Next.js-only keys (`metadataBase`, `icons`, `alternates.languages`) pass through; `themeColor` goes to `export const viewport`.
 
-## Framework rules
+## Rules
 
-- **Next.js:** never add `<meta>` or `<head>` JSX to App Router layouts — always use `export const metadata` (the fixer does this, creating the export and `import type { Metadata } from 'next'` when missing). If the route uses `generateMetadata`, the fixer merges into its returned object literal; check the diff, since dynamic values may need to stay dynamic. Relative `og:image` URLs need `metadataBase: new URL('https://your-domain')` in the root layout.
-- **Astro:** values bound to expressions (`<title>{title}</title>`, `title={post.title}`) are left untouched and reported as warnings — update the data source or the props passed to the layout instead.
-- **HTML:** existing tags are edited in place; missing tags are inserted before `</head>` with matching indentation.
+- **Never invent** facts, URLs, handles or image assets. If an OG image or favicon file is missing, say what's needed (size, path) instead of referencing a file that doesn't exist.
+- **Next.js:** never add `<meta>`/`<Head>` JSX in the App Router — the fixer uses `export const metadata`. Relative OG image URLs need `metadataBase: new URL('https://…')` in `app/layout.tsx`. Files with `"use client"` can't export metadata; pick the nearest server layout/page. The Pages Router (`pages/`) isn't supported by the fixer — edit `<Head>` manually.
+- **`noindex`:** only remove it if the user confirms the page should rank (`issue.fix` is `{ "robots": null }`).
+- **Dynamic routes** (`[slug]`): a static `metadata` export applies to every instance — prefer `generateMetadata` driven by the page data.
+- **Not handled by `apply_metadata_fix`:** JSON-LD bodies (edit the `<script type="application/ld+json">` or the component that renders it) and favicon/OG image files.
 
-## Issue cheat sheet
+## Issue codes → action
 
-| Code | Fix |
+| Code | Action |
 | --- | --- |
-| `meta/title-missing`, `meta/description-missing` | Add `title` / `description` |
-| `serp/title-truncated`, `serp/description-truncated` | Shorten using `validate_serp_snippet` |
-| `meta/canonical-missing` | `canonical: "https://…/route"` |
-| `meta/robots-noindex` | Confirm intent; `robots: null` to remove |
-| `og/image-missing`, `og/image-relative` | Absolute `openGraph.images[0].url` (Next.js: set `metadataBase`) |
-| `og/image-small`, `og/image-aspect-ratio` | Use a 1200×630 image; tell the user if a new asset is needed — don't fabricate one |
-| `twitter/card-missing`, `twitter/card-invalid` | `twitter.card: "summary_large_image"` |
-| `favicon/*` | Usually requires adding image files; list what's missing (sizes are in the report's `favicons.grid`) |
-| `jsonld/syntax` | Fix the JSON in the `<script type="application/ld+json">` block (often a trailing comma) |
+| `meta/title-missing`, `meta/description-missing`, `meta/*-short` | Draft copy (step 4) |
+| `serp/title-truncated`, `serp/description-truncated` | Shorten with `validate_serp_snippet` |
+| `meta/canonical-missing` | `canonical: "https://…/route"` (auto-filled when `og:url` exists) |
+| `meta/robots-noindex` | Confirm intent, then `robots: null` |
+| `og/*-missing`, `og/url-*`, `og/image-dimensions-*`, `twitter/card-*` | Use `issue.fix` / `suggestedUpdates` |
+| `og/image-relative` | Absolute URL; in Next.js set `metadataBase` |
+| `og/image-small`, `og/image-aspect-ratio`, `og/image-unreachable` | Needs a 1200×630 asset — tell the user |
+| `favicon/*` | Needs image files; sizes are in the report's `favicons` grid |
+| `jsonld/syntax` | Fix the JSON (often a trailing comma) |
 | `jsonld/required-missing`, `jsonld/recommended-missing` | Add the named schema.org properties to the entity at `path` |
-
-JSON-LD and favicon assets are not edited by `apply_metadata_fix`; change those files directly.

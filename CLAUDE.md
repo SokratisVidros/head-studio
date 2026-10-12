@@ -31,11 +31,16 @@ Build an NPM package (`head-studio`) providing a local visual developer interfac
 head-studio/
 ├── bin/cli.mjs               # Executable entrypoint (imports dist/cli.js)
 ├── src/
-│   ├── cli.ts                # citty commands: studio (default), inspect, serp, fix, mcp
+│   ├── cli.ts                # citty commands: studio (default), inspect, locate, serp, fix, init, doctor, mcp
+│   ├── integrations.ts       # `init`: MCP registration + skill install for Claude Code / Cursor / VS Code
 │   ├── index.ts              # Programmatic API
 │   ├── core/
 │   │   ├── fetcher.ts        # HTTP + static-file loading, href resolution
 │   │   ├── inspect.ts        # Orchestrates parsers/validators into an InspectReport
+│   │   ├── project.ts        # Framework / dev URL / build dir detection, target auto-detect
+│   │   ├── locate.ts         # Route → source file (Next.js app router, Astro, HTML)
+│   │   ├── suggest.ts        # Deterministic per-issue `fix` + `suggestedUpdates`
+│   │   ├── summary.ts        # Compact agent-facing report
 │   │   ├── types.ts          # Report schema (schemaVersion: 1)
 │   │   ├── parsers/          # Cheerio parsers: meta, opengraph, favicons, jsonld
 │   │   ├── validators/       # serp (Arial pixel widths), opengraph, favicons, jsonld, images
@@ -76,10 +81,16 @@ npx head-studio inspect --url http://localhost:3000/blog/post-1 --json
 npx head-studio mcp                                          # MCP over stdio
 ```
 
-### C. MCP Tools
-1. `inspect_route` — `{ url, route?, root? }` → full JSON report.
-2. `validate_serp_snippet` — `{ title, description }` → pixel widths, lengths, truncation.
-3. `apply_metadata_fix` — `{ filePath, targetFramework: "nextjs" | "astro" | "html", updates, dryRun? }` → applied keys, warnings, diff.
+### C. MCP Tools & Prompt
+1. `inspect_route` — `{ url?, route?, root?, detail? }` → compact summary by default (`detail: "full"` for the whole report); `url` auto-detected.
+2. `locate_source` — `{ route }` → file owning the route's metadata.
+3. `validate_serp_snippet` — `{ title, description }` → pixel widths, lengths, truncation.
+4. `apply_metadata_fix` — `{ filePath, targetFramework?, updates, dryRun? }` → applied keys, warnings, diff.
+5. Prompt `audit` — the full inspect → locate → draft → apply → verify loop.
+
+### D. Agent DX
+- `head-studio init` registers the server and installs `SKILL.md` per agent (idempotent, merges JSON, `--dry-run`).
+- Issues carry a `fix` only when derivable from the page; never invent copy, URLs or assets. Removing `noindex` is never part of `suggestedUpdates`.
 
 ## 5. Development Rules
 
@@ -104,3 +115,4 @@ npm run typecheck  # tsc --noEmit
 - [x] Phase 2: Local web dashboard (Overview, Meta & SERP, Social cards, Favicons, JSON-LD, All tags) served by Hono
 - [x] Phase 3: MCP server (`inspect_route`, `validate_serp_snippet`, `apply_metadata_fix`) over stdio
 - [x] Phase 4: AST fixer engine (Next.js, Astro, HTML) & `SKILL.md`
+- [x] Phase 5: Agent DX — `init`, `doctor`, `locate`, auto-detected targets, per-issue fixes, summary reports, `audit` prompt

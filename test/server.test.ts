@@ -63,10 +63,24 @@ describe('MCP server', () => {
   }
   const text = (r: unknown) => JSON.parse((r as { content: Array<{ text: string }> }).content[0].text);
 
-  it('lists the three tools', async () => {
+  it('lists the tools and the audit prompt', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['apply_metadata_fix', 'inspect_route', 'validate_serp_snippet']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['apply_metadata_fix', 'inspect_route', 'locate_source', 'validate_serp_snippet']);
+    const { prompts } = await client.listPrompts();
+    expect(prompts.map((p) => p.name)).toEqual(['audit']);
+    const prompt = await client.getPrompt({ name: 'audit', arguments: { route: '/blog' } });
+    expect((prompt.messages[0].content as { text: string }).text).toContain('locate_source');
+  });
+
+  it('returns a compact summary by default and the full report on request', async () => {
+    const client = await connect();
+    const summary = text(await client.callTool({ name: 'inspect_route', arguments: { url: SITE, route: '/blog/post-1' } }));
+    expect(summary.detail).toBe('summary');
+    expect(summary.suggestedUpdates).toMatchObject({ twitter: { card: 'summary_large_image' } });
+    expect(summary.meta).not.toHaveProperty('all');
+    const full = text(await client.callTool({ name: 'inspect_route', arguments: { url: SITE, detail: 'full' } }));
+    expect(full.meta.all.length).toBeGreaterThan(0);
   });
 
   it('runs inspect_route and validate_serp_snippet', async () => {

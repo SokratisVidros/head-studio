@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { fetchResolved } from '../core/fetcher.js';
 import { applyMetadataFix } from '../core/fixers/index.js';
 import { inspect } from '../core/inspect.js';
+import { locateSource } from '../core/locate.js';
 import { analyzeSerp } from '../core/validators/serp.js';
 import { VERSION } from '../version.js';
 
@@ -58,6 +59,8 @@ export function createApp(opts: AppOptions = {}) {
   });
 
   app.get('/api/health', (c) => c.json({ ok: true, version: VERSION }));
+  app.get('/api/locate', (c) => c.json(locateSource(c.req.query('route') ?? '/', workspaceRoot)));
+
   app.get('/api/config', (c) => c.json({ version: VERSION, defaultTarget: opts.defaultTarget ?? 'http://localhost:3000', workspaceRoot }));
 
   app.get('/api/inspect', async (c) => {

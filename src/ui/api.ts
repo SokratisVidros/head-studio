@@ -49,3 +49,13 @@ export function displayHost(url: string | null | undefined): string {
     return url;
   }
 }
+
+export interface LocateResponse {
+  route: string;
+  framework: string;
+  recommended: { file: string; framework: 'nextjs' | 'astro' | 'html'; metadata: string } | null;
+}
+
+export async function locate(route: string): Promise<LocateResponse> {
+  return json(await fetch(`/api/locate?route=${encodeURIComponent(route)}`));
+}

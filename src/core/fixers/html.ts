@@ -184,7 +184,12 @@ export function applyHeadOps(s: MagicString, source: string, headStart: number, 
   }
 
   if (inserts.length) {
-    if (closeOnOwnLine) {
+    // Group new tags with the existing <title>/<meta>/<link> tags rather than after scripts/styles.
+    const anchor = lastHeadTagEnd(source, headStart, headEnd);
+    const lineEnd = anchor != null ? source.indexOf('\n', anchor) : -1;
+    if (anchor != null && lineEnd !== -1 && lineEnd < headEnd && /^[ \t]*$/.test(source.slice(anchor, lineEnd))) {
+      s.appendLeft(lineEnd + 1, inserts.map((t) => `${indent}${t}\n`).join(''));
+    } else if (closeOnOwnLine) {
       const lineStart = headEnd - closeIndent.length;
       s.appendLeft(lineStart, inserts.map((t) => `${indent}${t}\n`).join(''));
     } else {
@@ -198,6 +203,17 @@ export function renderTag(op: HeadOp): string {
   if (op.kind === 'title') return `<title>${escapeText(op.value ?? '')}</title>`;
   if (op.kind === 'meta') return `<meta ${op.attr}="${escapeAttr(op.key)}" content="${escapeAttr(op.value ?? '')}" />`;
   return `<link rel="${escapeAttr(op.rel)}" href="${escapeAttr(op.value ?? '')}" />`;
+}
+
+/** End offset of the last <title>, <meta> or <link> tag inside the head, if any. */
+function lastHeadTagEnd(source: string, headStart: number, headEnd: number): number | null {
+  const re = /<title(?:\s[^>]*)?>[\s\S]*?<\/title\s*>|<(?:meta|link)\b[^>]*>/gi;
+  const head = source.slice(headStart, headEnd);
+  // Ignore tags inside <script>/<style>/<noscript> blocks.
+  const masked = head.replace(/<(script|style|noscript)\b[\s\S]*?<\/\1\s*>/gi, (m) => ' '.repeat(m.length));
+  let end: number | null = null;
+  for (const m of masked.matchAll(re)) end = headStart + m.index! + m[0].length;
+  return end;
 }
 
 export function fixHtml(code: string, filePath: string, updates: MetadataUpdates): FixOutput {

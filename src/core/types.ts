@@ -10,6 +10,12 @@ export interface Issue {
   message: string;
   /** Human/agent hint describing how to resolve the issue. */
   hint?: string;
+  /**
+   * Ready-to-apply `updates` (Next.js Metadata shape) for `apply_metadata_fix`, when the fix
+   * can be derived from the page itself. Copy that needs judgement (titles, descriptions) is
+   * never invented.
+   */
+  fix?: Record<string, unknown>;
 }
 
 export interface MetaTags {
@@ -159,5 +165,7 @@ export interface InspectReport {
   serp: SerpReport;
   jsonLd: JsonLdBlock[];
   issues: Issue[];
+  /** Deep-merge of every issue's `fix`, ready to pass to `apply_metadata_fix`. */
+  suggestedUpdates: Record<string, unknown>;
   summary: { errors: number; warnings: number; infos: number; score: number };
 }
