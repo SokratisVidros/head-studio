@@ -1,0 +1,39 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-surface: #0f1115;
+  --color-panel: #15181e;
+  --color-raised: #1b1f27;
+  --color-line: #262b35;
+  --color-muted: #8b93a3;
+  --color-brand: #10b981;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-surface);
+  color: #e6e8ec;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Google SERP renders in Arial; previews must use it for pixel-accurate truncation. */
+.font-arial {
+  font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a303b;
+  border-radius: 8px;
+  border: 2px solid var(--color-surface);
+}
