@@ -1,14 +1,40 @@
+@import '@fontsource-variable/jetbrains-mono';
 @import 'tailwindcss';
 
 @theme {
-  --color-surface: #0f1115;
-  --color-panel: #15181e;
-  --color-raised: #1b1f27;
-  --color-line: #262b35;
-  --color-muted: #8b93a3;
-  --color-brand: #10b981;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  /* Surfaces — Stripe-like light palette */
+  --color-canvas: #f6f9fc;
+  --color-panel: #ffffff;
+  --color-subtle: #f6f8fb;
+  --color-line: #e3e8ee;
+  --color-line-strong: #c9d2dc;
+
+  /* Text */
+  --color-ink: #0a2540;
+  --color-body: #425466;
+  --color-muted: #6b7c93;
+  --color-faint: #a3acb9;
+
+  /* Accent — single token, change here to rebrand */
+  --color-accent: #1a56f0;
+  --color-accent-hover: #1445c8;
+  --color-accent-soft: #edf2ff;
+
+  /* Status */
+  --color-err: #d4183c;
+  --color-err-soft: #fff0f2;
+  --color-warn: #a35a00;
+  --color-warn-soft: #fff7e8;
+  --color-ok: #0a7d52;
+  --color-ok-soft: #e7f7ef;
+  --color-note: #4f5b76;
+  --color-note-soft: #eef1f6;
+
+  --font-sans: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --shadow-card: 0 1px 1px rgb(10 37 64 / 0.03), 0 2px 6px -2px rgb(50 50 93 / 0.08);
+  --shadow-pop: 0 6px 20px -6px rgb(50 50 93 / 0.18), 0 2px 6px -2px rgb(10 37 64 / 0.06);
 }
 
 html,
@@ -17,10 +43,27 @@ body,
   height: 100%;
 }
 
+html {
+  color-scheme: light;
+}
+
 body {
-  background: var(--color-surface);
-  color: #e6e8ec;
+  background: var(--color-canvas);
+  color: var(--color-body);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-feature-settings: 'calt' 0, 'zero' 1;
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 /* Google SERP renders in Arial; previews must use it for pixel-accurate truncation. */
@@ -28,12 +71,22 @@ body {
   font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
 }
 
+/* Platform previews use each platform's own system font stack. */
+.font-platform {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.bg-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgb(10 37 64 / 0.07) 1px, transparent 0);
+  background-size: 16px 16px;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a303b;
+  background: #d5dce5;
   border-radius: 8px;
-  border: 2px solid var(--color-surface);
+  border: 2px solid var(--color-canvas);
 }

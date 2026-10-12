@@ -22,6 +22,8 @@ npx head-studio ./dist --port 4983      # start with a static build
 npx head-studio http://localhost:4321 --open
 ```
 
+Light, monospaced UI (JetBrains Mono, bundled — no network needed). The accent colour is a single token (`--color-accent` in `src/ui/styles.css`).
+
 Tabs: **Overview** (score + prioritized issues), **Meta & SERP** (Google preview, live snippet editor, apply-to-source), **Social cards** (Facebook, X, LinkedIn, Slack/Discord previews), **Favicons** (icon matrix, tab and home-screen previews), **JSON-LD** (tree viewer with per-entity issues) and **All tags**.
 
 The server binds to `127.0.0.1` and rejects requests whose `Host`/`Origin` is not local.

@@ -1,12 +1,12 @@
 import { Check, Copy, FileCode2, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 import { applyFix, type FixResponse } from '../api';
-import { cx, Panel } from './ui';
+import { buttonGhost, buttonPrimary, buttonSecondary, cx, inputClass, Panel, Segmented } from './ui';
 
 const FRAMEWORKS = [
-  { id: 'nextjs', label: 'Next.js', placeholder: 'app/layout.tsx' },
-  { id: 'astro', label: 'Astro', placeholder: 'src/pages/index.astro' },
-  { id: 'html', label: 'HTML', placeholder: 'public/index.html' },
+  { id: 'nextjs', label: 'next.js', placeholder: 'app/layout.tsx' },
+  { id: 'astro', label: 'astro', placeholder: 'src/pages/index.astro' },
+  { id: 'html', label: 'html', placeholder: 'public/index.html' },
 ] as const;
 
 function readPref(key: string, fallback: string) {
@@ -54,7 +54,7 @@ export function FixPanel({ updates, onApplied }: { updates: Record<string, unkno
     <Panel
       title={
         <span className="inline-flex items-center gap-2">
-          <Wand2 className="size-4 text-brand" /> Apply to source
+          <Wand2 className="size-3.5 text-accent" /> apply_metadata_fix
         </span>
       }
       actions={
@@ -64,58 +64,52 @@ export function FixPanel({ updates, onApplied }: { updates: Record<string, unkno
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted hover:bg-raised hover:text-zinc-200"
+          className={buttonGhost}
         >
-          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} Copy CLI command
+          {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />} {copied ? 'copied' : 'copy cli'}
         </button>
       }
     >
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <div className="flex rounded-md border border-line bg-surface p-0.5">
-          {FRAMEWORKS.map((f) => (
-            <button key={f.id} onClick={() => setFramework(f.id)} className={cx('rounded px-2.5 py-1 text-xs', framework === f.id ? 'bg-raised text-zinc-100' : 'text-muted hover:text-zinc-200')}>
-              {f.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-col gap-2 lg:flex-row">
+        <Segmented value={framework} onChange={setFramework} options={FRAMEWORKS.map((f) => ({ id: f.id as string, label: f.label }))} />
         <label className="relative flex-1">
-          <FileCode2 className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted" />
-          <input
-            value={filePath}
-            onChange={(e) => setFilePath(e.target.value)}
-            placeholder={placeholder}
-            aria-label="Source file path"
-            className="w-full rounded-md border border-line bg-surface py-1.5 pr-2 pl-8 font-mono text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-zinc-500"
-          />
+          <FileCode2 className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-faint" />
+          <input value={filePath} onChange={(e) => setFilePath(e.target.value)} placeholder={placeholder} aria-label="Source file path" className={cx(inputClass, 'pl-8')} />
         </label>
         <div className="flex gap-2">
-          <button disabled={!filePath || busy} onClick={() => run(true)} className="rounded-md border border-line px-3 py-1.5 text-xs text-zinc-200 hover:bg-raised disabled:opacity-40">
-            Preview diff
+          <button disabled={!filePath || busy} onClick={() => run(true)} className={buttonSecondary}>
+            dry run
           </button>
-          <button disabled={!filePath || busy} onClick={() => run(false)} className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-emerald-400 disabled:opacity-40">
-            Apply
+          <button disabled={!filePath || busy} onClick={() => run(false)} className={buttonPrimary}>
+            apply
           </button>
         </div>
       </div>
-      <pre className="mt-3 max-h-40 overflow-auto rounded-md bg-surface p-2.5 font-mono text-[11px] text-muted">{JSON.stringify(updates, null, 2)}</pre>
+      <pre className="mt-3 max-h-40 overflow-auto rounded-md bg-subtle p-3 text-[12px] leading-5 text-body ring-1 ring-line ring-inset">{JSON.stringify(updates, null, 2)}</pre>
       {result && (
         <div className="mt-3 space-y-2">
           {result.error ? (
-            <p className="text-sm text-red-400">{result.error}</p>
+            <p className="text-err">✕ {result.error}</p>
           ) : (
-            <p className="text-sm text-emerald-300">
-              {result.dryRun ? 'Preview of' : 'Updated'} {result.filePath} — {result.applied.join(', ') || 'no changes'}
+            <p className="text-ok">
+              ✓ {result.dryRun ? 'dry run' : 'wrote'} {result.filePath} <span className="text-muted">— {result.applied.join(', ') || 'no changes'}</span>
             </p>
           )}
           {result.warnings.map((w) => (
-            <p key={w} className="text-xs text-amber-300">
-              {w}
+            <p key={w} className="text-[12px] text-warn">
+              ! {w}
             </p>
           ))}
           {result.diff && (
-            <pre className="max-h-80 overflow-auto rounded-md bg-surface p-2.5 font-mono text-[11px] leading-relaxed">
+            <pre className="max-h-80 overflow-auto rounded-md border border-line bg-panel py-2 text-[12px] leading-5">
               {result.diff.split('\n').map((l, i) => (
-                <div key={i} className={l.startsWith('+') && !l.startsWith('+++') ? 'text-emerald-300' : l.startsWith('-') && !l.startsWith('---') ? 'text-red-400' : 'text-muted'}>
+                <div
+                  key={i}
+                  className={cx(
+                    'px-3',
+                    l.startsWith('+') && !l.startsWith('+++') ? 'bg-ok-soft text-ok' : l.startsWith('-') && !l.startsWith('---') ? 'bg-err-soft text-err' : l.startsWith('@@') ? 'text-accent' : 'text-muted',
+                  )}
+                >
                   {l || ' '}
                 </div>
               ))}
