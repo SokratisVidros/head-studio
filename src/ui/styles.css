@@ -61,9 +61,177 @@ body {
   color: var(--color-ink);
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
+/*
+ * Keyboard focus ring. Lives in the base layer so component utilities (outline-none,
+ * focus-within rings on composite inputs) can override it — unlayered CSS would beat
+ * every Tailwind utility. Text fields draw their own ring on the wrapper instead.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+  }
+}
+
+/*
+ * Buttons with physical depth: a 1px outline ring, an inner top highlight, a soft
+ * top-to-bottom sheen and a small drop shadow. Pressing flattens the shadow and nudges
+ * the button down half a pixel, so it reads as being pushed in.
+ */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    user-select: none;
+    transition-property: box-shadow, background-color, color, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(0.5px);
+  }
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    color: white;
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0) 60%), var(--color-accent);
+    box-shadow:
+      0 0 0 1px var(--color-accent-hover),
+      inset 0 1px 0 rgb(255 255 255 / 0.24),
+      inset 0 -1px 0 rgb(0 0 0 / 0.08),
+      0 1px 1px rgb(10 37 64 / 0.1),
+      0 2px 6px -1px rgb(26 86 240 / 0.38);
+    text-shadow: 0 1px 0 rgb(0 0 0 / 0.12);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0) 60%), #2160f5;
+    box-shadow:
+      0 0 0 1px var(--color-accent-hover),
+      inset 0 1px 0 rgb(255 255 255 / 0.28),
+      inset 0 -1px 0 rgb(0 0 0 / 0.08),
+      0 1px 1px rgb(10 37 64 / 0.12),
+      0 4px 10px -2px rgb(26 86 240 / 0.45);
+  }
+  .btn-primary:active:not(:disabled) {
+    background: linear-gradient(180deg, rgb(0 0 0 / 0.06), rgb(0 0 0 / 0) 60%), var(--color-accent-hover);
+    box-shadow:
+      0 0 0 1px var(--color-accent-hover),
+      inset 0 1px 2px rgb(0 0 0 / 0.18),
+      0 1px 1px rgb(10 37 64 / 0.06);
+  }
+
+  .btn-secondary {
+    color: var(--color-ink);
+    background: linear-gradient(180deg, #ffffff, #f9fafb);
+    box-shadow:
+      0 0 0 1px rgb(10 37 64 / 0.13),
+      inset 0 -1px 0 rgb(10 37 64 / 0.05),
+      0 1px 2px rgb(10 37 64 / 0.08),
+      0 2px 4px -2px rgb(10 37 64 / 0.06);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffffff, #f4f6f9);
+    box-shadow:
+      0 0 0 1px rgb(10 37 64 / 0.2),
+      inset 0 -1px 0 rgb(10 37 64 / 0.05),
+      0 1px 2px rgb(10 37 64 / 0.1),
+      0 3px 6px -2px rgb(10 37 64 / 0.1);
+  }
+  .btn-secondary:active:not(:disabled) {
+    background: #f4f6f9;
+    box-shadow:
+      0 0 0 1px rgb(10 37 64 / 0.16),
+      inset 0 1px 2px rgb(10 37 64 / 0.1);
+  }
+
+  /* Selected state for toggles: tinted, still raised. */
+  .btn-secondary[aria-pressed='true'] {
+    color: var(--color-accent);
+    background: linear-gradient(180deg, #ffffff, var(--color-accent-soft));
+    box-shadow:
+      0 0 0 1px rgb(26 86 240 / 0.35),
+      inset 0 -1px 0 rgb(26 86 240 / 0.08),
+      0 1px 2px rgb(26 86 240 / 0.12);
+  }
+
+  .btn-sm {
+    border-radius: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 12px;
+    line-height: 1rem;
+  }
+
+  /* Raised thumb inside segmented controls. */
+  .seg-thumb {
+    background: linear-gradient(180deg, #ffffff, #fbfcfd);
+    box-shadow:
+      0 0 0 1px rgb(10 37 64 / 0.12),
+      0 1px 2px rgb(10 37 64 / 0.1),
+      0 2px 4px -2px rgb(10 37 64 / 0.08);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn {
+      transition-duration: 0ms;
+    }
+    .btn:active:not(:disabled) {
+      transform: none;
+    }
+  }
+}
+
+/*
+ * Preview transitions. The incoming preview slides in from the side you navigated
+ * toward (--dx) while fading up; issue notes fade in just after it lands, since their
+ * anchors are re-measured once the slide ends. Opacity only on notes: their transform
+ * is owned by the drag/spring code.
+ */
+@keyframes preview-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--dx, 0px)) scale(0.995);
+  }
+}
+@keyframes note-in {
+  from {
+    opacity: 0;
+  }
+}
+.preview-in {
+  animation: preview-in 240ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+.note-in {
+  animation: note-in 200ms cubic-bezier(0.2, 0, 0, 1) 160ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-in,
+  .note-in {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
+
+/* Keyboard navigation: the level arrows currently drive (sidebar or a tab row). Soft, not a focus ring. */
+[data-kbd-active] {
+  outline: 2px solid rgb(26 86 240 / 0.22);
+  outline-offset: 3px;
+  border-radius: 0.5rem;
+  transition: outline-color 150ms;
 }
 
 /* Google SERP renders in Arial; previews must use it for pixel-accurate truncation. */

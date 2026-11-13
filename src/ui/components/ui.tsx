@@ -1,5 +1,5 @@
 import { CheckCircle2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Issue, Severity } from '../../core/types';
 
 export function cx(...parts: Array<string | false | null | undefined>) {
@@ -103,14 +103,41 @@ export function Meter({ value, limit, label }: { value: number; limit: number; l
   );
 }
 
-export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: Array<{ id: T; label: ReactNode }>; onChange: (v: T) => void }) {
+/**
+ * Segmented control with a sliding thumb: the raised indicator glides to the selected
+ * option (transform + width, 220ms ease-out) instead of jumping between buttons.
+ */
+export function Segmented<T extends string>({ value, options, onChange, row = 0 }: { value: T; options: Array<{ id: T; label: ReactNode; title?: string }>; onChange: (v: T) => void; row?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState<{ x: number; w: number } | null>(null);
+  const place = useCallback(() => {
+    const el = ref.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (el) setThumb((t) => (t && t.x === el.offsetLeft && t.w === el.offsetWidth ? t : { x: el.offsetLeft, w: el.offsetWidth }));
+  }, []);
+  useLayoutEffect(place, [place, value, options]);
+  useEffect(() => {
+    // Re-place when labels change size (font load, icon swap).
+    const ro = new ResizeObserver(place);
+    if (ref.current) ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, [place]);
   return (
-    <div className="inline-flex rounded-md bg-subtle p-0.5 ring-1 ring-line ring-inset">
+    <div ref={ref} data-kbd-row={row} role="group" className="relative inline-flex rounded-md bg-subtle p-0.5 ring-1 ring-line ring-inset">
+      {thumb && (
+        <span
+          aria-hidden
+          className="seg-thumb absolute top-0.5 bottom-0.5 left-0 rounded-[5px] transition-[transform,width] duration-[220ms] ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none"
+          style={{ width: thumb.w, transform: `translateX(${thumb.x}px)` }}
+        />
+      )}
       {options.map((o) => (
         <button
           key={o.id}
           onClick={() => onChange(o.id)}
-          className={cx('inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-[12px] transition', value === o.id ? 'bg-panel text-ink shadow-card ring-1 ring-line' : 'text-muted hover:text-ink')}
+          title={o.title}
+          aria-label={o.title}
+          aria-pressed={value === o.id}
+          className={cx('relative inline-flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-[12px] transition-colors duration-150', value === o.id ? 'text-ink' : 'text-muted hover:text-ink')}
         >
           {o.label}
         </button>
@@ -122,10 +149,32 @@ export function Segmented<T extends string>({ value, options, onChange }: { valu
 export const inputClass =
   'w-full rounded-md border border-line bg-panel px-2.5 py-1.5 text-ink outline-none transition placeholder:text-faint hover:border-line-strong focus:border-accent focus:ring-3 focus:ring-accent/15';
 
-export const buttonPrimary =
-  'inline-flex items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-medium text-white shadow-card transition hover:bg-accent-hover disabled:opacity-50';
+export const buttonPrimary = 'btn btn-primary';
 
-export const buttonSecondary =
-  'inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-panel px-3 py-1.5 text-ink shadow-card transition hover:border-line-strong disabled:opacity-50';
+export const buttonSecondary = 'btn btn-secondary';
 
 export const buttonGhost = 'inline-flex items-center gap-1.5 rounded px-2 py-1 text-[12px] text-muted transition hover:bg-subtle hover:text-ink';
+
+/** True when keys should go to the focused element (text entry or a draggable note), not shortcuts. */
+export function isEditing(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el || !el.closest) return false;
+  return !!el.closest('input, textarea, select, [contenteditable="true"], [data-note]');
+}
+
+/** True for any CSS colour the browser understands (hex, rgb(), hsl(), named…). */
+export function isColor(value: string | null | undefined): value is string {
+  return !!value && typeof CSS !== 'undefined' && CSS.supports('color', value.trim());
+}
+
+/** A colour value with a small swatch box beside it; plain text when it isn't a colour. */
+export function ColorValue({ value }: { value: string | null | undefined }) {
+  if (!value) return <span className="text-muted">—</span>;
+  if (!isColor(value)) return <>{value}</>;
+  return (
+    <span className="inline-flex items-center gap-1.5 align-middle">
+      <span aria-hidden className="size-3.5 shrink-0 rounded-[3px] shadow-[inset_0_0_0_1px_rgb(10_37_64/0.14)]" style={{ backgroundColor: value.trim() }} />
+      <span>{value}</span>
+    </span>
+  );
+}

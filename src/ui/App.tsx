@@ -1,13 +1,15 @@
-import { ArrowRight, Braces, Image, LayoutGrid, Loader2, RotateCw, Search, Share2, Tags } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
+import { ArrowRight, Braces, Image, LayoutGrid, Loader2, Presentation, RotateCw, Search, Share2, Tags } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { getConfig, inspectTarget, type InspectReport } from './api';
 import { FaviconView } from './components/FaviconView';
 import { JsonLdView } from './components/JsonLdView';
 import { OgView } from './components/OgView';
+import { Present } from './components/Present';
 import { Overview } from './components/Overview';
 import { SerpView } from './components/SerpView';
 import { TagsView } from './components/TagsView';
-import { cx } from './components/ui';
+import { cx, isEditing } from './components/ui';
+import { useKeyNav } from './keynav';
 
 type Tab = 'overview' | 'serp' | 'og' | 'favicons' | 'jsonld' | 'tags';
 
@@ -46,6 +48,31 @@ function Logo() {
   );
 }
 
+const Kbd = ({ children }: { children: React.ReactNode }) => (
+  <kbd className="inline-grid h-[18px] min-w-[18px] place-items-center rounded border border-line bg-panel px-1 text-[10px] text-muted shadow-[0_1px_0_var(--color-line)]">{children}</kbd>
+);
+
+function KeyLegend() {
+  const rows: Array<[React.ReactNode, string]> = [
+    [<><Kbd>↑</Kbd><Kbd>↓</Kbd></>, 'sections · rows'],
+    [<><Kbd>→</Kbd><Kbd>↵</Kbd></>, 'into tabs'],
+    [<><Kbd>←</Kbd><Kbd>→</Kbd></>, 'switch tab'],
+    [<Kbd>space</Kbd>, 'next option'],
+    [<Kbd>esc</Kbd>, 'back'],
+    [<Kbd>p</Kbd>, 'present'],
+  ];
+  return (
+    <dl className="mt-6 hidden space-y-1.5 px-2.5 text-[11px] text-faint md:block">
+      {rows.map(([keys, label], i) => (
+        <div key={i} className="flex items-center gap-2">
+          <dt className="flex w-14 shrink-0 gap-0.5">{keys}</dt>
+          <dd>{label}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export function App() {
   const params = new URLSearchParams(location.search);
   const [target, setTarget] = useState(params.get('target') ?? '');
@@ -55,6 +82,7 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [version, setVersion] = useState('');
   const [recent, setRecent] = useState<string[]>(readHistory);
+  const [presenting, setPresenting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const run = useCallback(async (t: string) => {
@@ -101,12 +129,24 @@ export function App() {
         e.preventDefault();
         inputRef.current?.focus();
         inputRef.current?.select();
+        return;
+      }
+      if (e.key === 'p' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !isEditing(e.target) && reportRef.current) {
+        e.preventDefault();
+        setPresenting(true);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  const reportRef = useRef(report);
+  reportRef.current = report;
+  const closePresent = useCallback(() => setPresenting(false), []);
+  const sectionIds = useMemo(() => TABS.map((t) => t.id), []);
+  useKeyNav({ sections: sectionIds, current: tab, select: (id) => setTab(id as Tab), disabled: presenting });
   const count = (cats: string[]) => (report ? report.issues.filter((i) => cats.includes(i.category) && i.severity !== 'info') : []);
   const fresh = report && report.target === target.trim();
 
@@ -139,18 +179,23 @@ export function App() {
               />
               <kbd className="mr-2 hidden rounded border border-line bg-subtle px-1.5 text-[10px] text-muted sm:block">⌘K</kbd>
             </label>
-            <button type="submit" disabled={loading} className="inline-flex h-[38px] items-center gap-1.5 rounded-md bg-accent px-3.5 font-medium text-white shadow-card transition hover:bg-accent-hover disabled:opacity-60">
+            <button type="submit" disabled={loading} className="btn btn-primary h-[38px] px-3.5">
               {loading ? <Loader2 className="size-4 animate-spin" /> : fresh ? <RotateCw className="size-4" /> : <ArrowRight className="size-4" />}
               <span className="hidden sm:inline">{fresh ? 'rerun' : 'run'}</span>
             </button>
           </form>
+          <button type="button" onClick={() => setPresenting(true)} disabled={!report} className="btn btn-secondary h-[38px] px-3" title="Present all previews full screen (p)">
+            <Presentation className="size-4" />
+            <span className="hidden sm:inline">present</span>
+          </button>
         </div>
       </header>
+      {presenting && report && <Present report={report} onClose={closePresent} />}
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <aside className="shrink-0 border-b border-line md:w-56 md:border-r md:border-b-0">
           <nav className="flex gap-1 overflow-x-auto px-3 py-2 md:flex-col md:overflow-visible md:py-4">
-            <div className="hidden px-2.5 pb-2 text-[11px] text-faint md:block">// report</div>
+            <div role="tablist" data-kbd-sections aria-label="Report sections" aria-orientation="vertical" className="flex gap-1 rounded-lg md:flex-col">
             {TABS.map(({ id, label, icon: Icon, categories }) => {
               const issues = count(categories);
               const errors = issues.filter((i) => i.severity === 'error').length;
@@ -158,10 +203,13 @@ export function App() {
               return (
                 <button
                   key={id}
+                  role="tab"
+                  aria-selected={active}
+                  tabIndex={active ? 0 : -1}
                   onClick={() => setTab(id)}
                   className={cx(
                     'flex shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition',
-                    active ? 'bg-panel text-accent shadow-card ring-1 ring-line' : 'text-body hover:bg-panel/70 hover:text-ink',
+                    active ? 'seg-thumb text-accent' : 'text-body hover:bg-panel/70 hover:text-ink',
                   )}
                 >
                   <Icon className={cx('size-4', active ? 'text-accent' : 'text-faint')} />
@@ -170,6 +218,7 @@ export function App() {
                 </button>
               );
             })}
+            </div>
             {recent.length > 1 && (
               <div className="mt-6 hidden md:block">
                 <div className="px-2.5 pb-2 text-[11px] text-faint">// recent</div>
@@ -188,6 +237,7 @@ export function App() {
                 ))}
               </div>
             )}
+            <KeyLegend />
           </nav>
         </aside>
 
@@ -207,12 +257,6 @@ export function App() {
             )}
             {report && (
               <div className={cx('transition-opacity', loading && 'opacity-50')}>
-                <div className="mb-5">
-                  <div className="text-[11px] text-faint">// {TABS.find((t) => t.id === tab)?.label}</div>
-                  <h1 className="mt-1 truncate text-lg font-semibold tracking-tight text-ink" title={report.url}>
-                    {report.meta.title ?? report.url}
-                  </h1>
-                </div>
                 {tab === 'overview' && <Overview report={report} onNavigate={(t) => setTab(t as Tab)} />}
                 {tab === 'serp' && <SerpView report={report} onApplied={() => void run(report.target)} />}
                 {tab === 'og' && <OgView report={report} />}

@@ -1,7 +1,7 @@
 import { ImageOff } from 'lucide-react';
 import type { InspectReport } from '../../core/types';
 import { assetUrl } from '../api';
-import { IssueList, Panel, StatusBadge } from './ui';
+import { ColorValue, IssueList, Panel, StatusBadge } from './ui';
 
 export function FaviconView({ report }: { report: InspectReport }) {
   const { grid, manifest, links } = report.favicons;
@@ -99,13 +99,13 @@ export function FaviconView({ report }: { report: InspectReport }) {
                       ['short_name', manifest.shortName],
                       ['display', manifest.display],
                       ['theme_color', manifest.themeColor],
+                      ['background_color', manifest.backgroundColor],
                     ] as const
                   ).map(([k, v]) => (
                     <div key={k}>
                       <div className="text-muted">{k}</div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-ink">
-                        {k === 'theme_color' && v && <span className="size-3 rounded-sm ring-1 ring-line" style={{ background: v }} />}
-                        {v ?? '—'}
+                        {k.endsWith('_color') ? <ColorValue value={v} /> : (v ?? '—')}
                       </div>
                     </div>
                   ))}

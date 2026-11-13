@@ -4,7 +4,7 @@ import { analyzeSerp } from '../../core/validators/serp';
 import type { InspectReport, SerpDeviceResult } from '../../core/types';
 import { assetUrl, displayHost } from '../api';
 import { FixPanel } from './FixPanel';
-import { cx, inputClass, IssueList, KeyValue, Meter, Panel, Pill, Segmented } from './ui';
+import { ColorValue, cx, inputClass, IssueList, KeyValue, Meter, Panel, Pill, Segmented } from './ui';
 
 function breadcrumb(url: string) {
   try {
@@ -16,7 +16,7 @@ function breadcrumb(url: string) {
   }
 }
 
-function GoogleResult({ result, url, siteName, favicon, device }: { result: SerpDeviceResult; url: string; siteName: string; favicon?: string; device: 'desktop' | 'mobile' }) {
+export function GoogleResult({ result, url, siteName, favicon, device }: { result: SerpDeviceResult; url: string; siteName: string; favicon?: string; device: 'desktop' | 'mobile' }) {
   const crumb = breadcrumb(url);
   return (
     <div className={cx('font-arial bg-white text-left', device === 'mobile' ? 'w-[360px] max-w-full rounded-2xl p-4 shadow-[0_1px_6px_rgba(32,33,36,0.18)]' : 'w-[652px] max-w-full')}>
@@ -71,8 +71,8 @@ export function SerpView({ report, onApplied }: { report: InspectReport; onAppli
             value={device}
             onChange={setDevice}
             options={[
-              { id: 'desktop', label: <><Monitor className="size-3.5" /> desktop</> },
-              { id: 'mobile', label: <><Smartphone className="size-3.5" /> mobile</> },
+              { id: 'desktop', label: <Monitor className="size-3.5" />, title: 'Desktop' },
+              { id: 'mobile', label: <Smartphone className="size-3.5" />, title: 'Mobile' },
             ]}
           />
         }
@@ -140,7 +140,7 @@ export function SerpView({ report, onApplied }: { report: InspectReport; onAppli
               ['viewport', report.meta.viewport],
               ['charset', report.meta.charset],
               ['lang', report.meta.lang],
-              ['theme-color', report.meta.themeColor ?? <span className="text-muted">—</span>],
+              ['theme-color', <ColorValue value={report.meta.themeColor} />],
             ]}
           />
         </Panel>
